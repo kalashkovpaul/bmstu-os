@@ -39,7 +39,12 @@ int main() {
 		{
 			close(fd[0]);
 			write(fd[1], message[i], (strlen(message[i]) + 1) * sizeof(char));
+			printf("Message from child pid = %d %s sent to parent\n", getpid(), message[i]);
 			return 0;
+		}
+		else
+		{
+			printf("parent pid: %d, child %d, group %d\n", getpid(), child_pid[i], getpgrp());
 		}
 	}
 
