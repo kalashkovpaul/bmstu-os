@@ -11,7 +11,7 @@ int main()
 {
 	pid_t child_pid[2];
 	int fd[2];
-	char *message[2] = {"FFF", "SSS"};
+	char *message[2] = {"FFFFFFFFFFFFFFFFF", "SSS"};
 	if (pipe(fd) == -1)
 	{
 		perror("Can't pipe :(\n");
@@ -39,13 +39,12 @@ int main()
 	for (int i = 0; i < 2; i++)
 	{
 		printf("PARENT: id %d prgp: %d child_%d: %d\n", getpid(), getpgrp(), i, child_pid[i]);
-		char text[(strlen(message[i]) + 1)];
 		int status;
 
 		waitpid(child_pid[i], &status, 0);
 		close(fd[1]);
-		read(fd[0], text, (strlen(message[i]) + 1));
-		printf("%s\n", text);
+		read(fd[0], message[i], (strlen(message[i]) + 1));
+		printf("%s\n", message[i]);
 		print_status(status);
 	}
 	return 0;

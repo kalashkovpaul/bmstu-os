@@ -16,7 +16,7 @@ int main() {
 	signal(SIGINT, sig_handler);
 	int child_pid[2];
 	int fd[2];
-	char *message[2] = {"FFF", "SSS"};
+	char *message[2] = {"FFFFFFFF", "SSS"};
 	int msg_len = 8;
 	if (pipe(fd) == -1)
 	{
@@ -50,14 +50,14 @@ int main() {
 
 	if (child_pid[0] && child_pid[1])
 	{
-		char text_1[msg_len], text_2[msg_len];
+		// char text_1[msg_len], text_2[msg_len];
 		pid_t child_pid;
 		int status;
 
 		close(fd[1]);
 
-		read(fd[0], text_1, msg_len);
-		read(fd[0], text_2, msg_len);
+		read(fd[0], message[0], msg_len);
+		read(fd[0], message[1], msg_len);
 
 		printf("PARENT\n");
 		printf("Ctrl + C = child_1, else child_2\nWaiting 3 sec...\n\n");
@@ -65,12 +65,12 @@ int main() {
 		if (flag)
 		{
 			printf("CHILD_1\n");
-			printf("%s\n", text_1);
+			printf("%s\n", message[0]);
 		}
 		else
 		{
 			printf("CHILD_2\n");
-			printf("%s\n", text_2);
+			printf("%s\n", message[1]);
 		}
 
 		for (int i = 0; i < 2; i++)
@@ -106,5 +106,5 @@ void print_status(int status)
 void sig_handler(int signal)
 {
 	flag = true;
-	printf("%d\n", signal);
+	printf("Caught signal: %d\n", signal);
 }
