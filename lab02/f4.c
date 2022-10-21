@@ -4,7 +4,6 @@
 #include <sys/wait.h>
 #include <string.h>
 
-
 void print_status(int status);
 
 int main()

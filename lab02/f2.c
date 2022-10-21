@@ -3,8 +3,6 @@
 #include <stdlib.h>
 #include <sys/wait.h>
 
-#define TIME 2
-
 void print_status(int status);
 
 int main()
@@ -20,7 +18,7 @@ int main()
 		}
 		if (child_pid[i] == 0)
 		{
-			sleep(TIME);
+			sleep(2);
 			printf("child_%d: id %d ppid: %d pgrp: %d\n", i, getpid(), getppid(), getpgrp());
 			return 0;
 		}

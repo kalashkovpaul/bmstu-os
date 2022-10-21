@@ -2,9 +2,6 @@
 #include <unistd.h>
 #include <stdlib.h>
 
-
-#define TIME 2
-
 int main()
 {
 	pid_t child_pid[2];
@@ -18,7 +15,7 @@ int main()
 		if (child_pid[i] == 0)
 		{
 			printf("child_%d: id %d ppid: %d pgrp: %d\n", i, getpid(), getppid(), getpgrp());
-			sleep(TIME);
+			sleep(2);
 			printf("child_%d: id %d ppid: %d pgrp: %d\n", i, getpid(), getppid(), getpgrp());
 			return 0;
 		}

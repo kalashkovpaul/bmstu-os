@@ -3,8 +3,6 @@
 #include <stdlib.h>
 #include <sys/wait.h>
 
-#define TIME 2
-
 void print_status(int status);
 
 int main()

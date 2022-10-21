@@ -50,7 +50,6 @@ int main() {
 
 	if (child_pid[0] && child_pid[1])
 	{
-		// char text_1[msg_len], text_2[msg_len];
 		pid_t child_pid;
 		int status;
 
