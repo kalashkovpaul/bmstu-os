@@ -3,12 +3,12 @@
 #include <stdlib.h>
 #include <sys/wait.h>
 
-void print_status(int status);
+void check_status(int status);
 
 int main()
 {
 	pid_t child_pid[2];
-	pid_t childpid = 0;
+	pid_t childpid;
 	for (int i = 0; i < 2; i++)
 	{
 		if ((child_pid[i] = fork()) == -1)
@@ -18,7 +18,6 @@ int main()
 		}
 		if (child_pid[i] == 0)
 		{
-			sleep(2);
 			printf("child_%d: id %d ppid: %d pgrp: %d\n", i, getpid(), getppid(), getpgrp());
 			return 0;
 		}
@@ -27,15 +26,21 @@ int main()
 	for (int i = 0; i < 2; i++)
 	{
 		childpid = waitpid(child_pid[i], &status, 0);
-		printf("Status: %d, child_pid: %d\n",status,childpid);
-		print_status(status);
-		printf("Parent: pid: %d pgrp: %d childpid: %d\n", getpid(), getpgrp(), child_pid[i]);
-		printf("\n");
+		if (childpid == -1)
+		{
+			printf("waitpid failure\n");
+		}
+		else
+		{
+			printf("Process exit status: %d, child_pid: %d\n", status, childpid);
+			check_status(status);
+			printf("Parent: pid: %d pgrp: %d childpid: %d\n", getpid(), getpgrp(), child_pid[i]);
+		}
 	}
 	return 0;
 }
 
-void print_status(int status)
+void check_status(int status)
 {
 	if (WIFEXITED(status))
 		printf("Child exited all right. Exit code: %d\n", WEXITSTATUS(status));

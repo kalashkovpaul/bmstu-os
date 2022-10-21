@@ -3,12 +3,14 @@
 #include <stdlib.h>
 #include <sys/wait.h>
 
-void print_status(int status);
+void check_status(int status);
 
 int main()
 {
 	int child_pid[2];
-	char exec_program[] = "./lab_05_01_06/a.out";
+	pid_t childpid;
+	int status;
+	char *exec_program[] = {"./lab_05_01_06/a1.out", "./lab_05_01_06/a.out"};
 	for (int i = 0; i < 2; i++)
 	{
 		if ((child_pid[i] = fork()) == -1)
@@ -19,7 +21,7 @@ int main()
 		if (child_pid[i] == 0)
 		{
 			printf("child_%d: id %d ppid: %d pgrp: %d\n", i, getpid(), getppid(), getpgrp());
-			if (execl(exec_program, NULL) == -1)
+			if (execl(exec_program[i], NULL) == -1)
 			{
 				printf("Exec error");
 				exit(1);
@@ -27,20 +29,24 @@ int main()
 			return 0;
 		}
 	}
-	int status;
-	pid_t childpid = 0;
 	for (int i = 0; i < 2; i++)
 	{
 		childpid = waitpid(child_pid[i], &status, 0);
-		printf("Status: %d, child_pid: %d\n",status,childpid);
-		print_status(status);
-		printf("Parent: pid: %d childpid: %d pgrp: %d\n", getpid(), child_pid[i], getpgrp());
-		printf("\n");
+		if (childpid == -1)
+		{
+			printf("waitpid failure\n");
+		}
+		else
+		{
+			printf("Process exit status: %d, child_pid: %d\n", status, childpid);
+			check_status(status);
+			printf("Parent: pid: %d pgrp: %d childpid: %d\n", getpid(), getpgrp(), child_pid[i]);
+		}
 	}
 	return 0;
 }
 
-void print_status(int status)
+void check_status(int status)
 {
 	if (WIFEXITED(status))
 		printf("Child exited all right. Exit code: %d\n", WEXITSTATUS(status));

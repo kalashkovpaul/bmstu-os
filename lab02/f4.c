@@ -4,12 +4,13 @@
 #include <sys/wait.h>
 #include <string.h>
 
-void print_status(int status);
+void check_status(int status);
 
 int main()
 {
 	pid_t child_pid[2];
 	int fd[2];
+	int childpid;
 	char *message[2] = {"FFFFFFFFFFFFFFFFF", "SSS"};
 	if (pipe(fd) == -1)
 	{
@@ -40,16 +41,24 @@ int main()
 		printf("PARENT: id %d prgp: %d child_%d: %d\n", getpid(), getpgrp(), i, child_pid[i]);
 		int status;
 
-		waitpid(child_pid[i], &status, 0);
-		close(fd[1]);
-		read(fd[0], message[i], (strlen(message[i]) + 1));
-		printf("%s\n", message[i]);
-		print_status(status);
+		childpid = waitpid(child_pid[i], &status, 0);
+		if (childpid == -1)
+		{
+			printf("waitpid failure\n");
+		}
+		else
+		{
+			printf("Process exit status: %d, child_pid: %d\n", status, childpid);
+			check_status(status);
+			close(fd[1]);
+			read(fd[0], message[i], (strlen(message[i]) + 1));
+			printf("%s\n", message[i]);
+		}
 	}
 	return 0;
 }
 
-void print_status(int status)
+void check_status(int status)
 {
 	if (WIFEXITED(status))
 		printf("Child exited all right. Exit code: %d\n", WEXITSTATUS(status));
