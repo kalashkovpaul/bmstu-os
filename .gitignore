@@ -2,3 +2,5 @@
 *.log
 *.bbl
 *.blg
+*.out
+*.h.gch
