@@ -1,18 +1,17 @@
-// #include <unistd.h>
-// #include <stdlib.h>
-// #include <fcntl.h>
-// #include <syslog.h>
-// #include <string.h>
-// #include <errno.h>
-// #include <stdio.h>
-// #include <sys/stat.h>
-// #include "apue.h"
-// #include <pthread.h>
-// #include <sys/resource.h>
-// #include <signal.h>
-#include "apue.h"
-#include <pthread.h>
 #include <syslog.h>
+#include <fcntl.h>
+#include <sys/resource.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <signal.h>
+#include <errno.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/file.h>
+#include <time.h>
+#include <pthread.h>
 
 #define LOCKFILE "/var/run/daemon.pid"
 #define LOCKMODE (S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH)
@@ -127,29 +126,30 @@ void daemonize(const char *cmd)
     }
 }
 
-// void *thr_fn(void *arg)
-// {
-//     int err, signo;
-//     for (;;) {
-//         err = sigwait(&mask, &signo);
-//         if (err != 0) {
-//             syslog(LOG_ERR, "ошибка вызова функции sigwait");
-//             exit(1);
-//         }
-//         switch (signo) {
-//             case SIGHUP:
-//                 syslog(LOG_INFO, "Чтение конфигурационного файла");
-//                 reread();
-//                 break;
-//             case SIGTERM:
-//                 syslog(LOG_INFO, "получен сигнал SIGTERM; выход");
-//                 exit(0);
-//             default:
-//                 syslog(LOG_INFO, "получен непредвиденный сигнал %d\n", signo);
-//         }
-//     }
-//     return(0);
-// }
+void *thr_fn(void *arg)
+{
+    int err, signo;
+
+    for (;;) {
+        err = sigwait(&mask, &signo);
+        if (err != 0) {
+            syslog(LOG_ERR, "ошибка вызова функции sigwait");
+            exit(1);
+        }
+        switch (signo) {
+        case SIGHUP:
+            syslog(LOG_INFO, "Чтение конфигурационного файла");
+
+            break;
+        case SIGTERM:
+            syslog(LOG_INFO, "получен SIGTERM; выход");
+            exit(0);
+        default:
+            syslog(LOG_INFO, "получен непредвиденный сигнал %d\n", signo);
+        }
+    }
+    return 0;
+}
 
 void *daemon_body(void *arg)
 {
@@ -164,43 +164,52 @@ void *daemon_body(void *arg)
 
 int main(int argc, char *argv[])
 {
-    int err;
+    time_t t;
+    int fd, err;
     pthread_t tid;
     char *cmd;
     struct sigaction sa;
+
+    printf("Login before daemonize:%s\n", getlogin());
+
     if ((cmd = strrchr(argv[0], '/')) == NULL)
         cmd = argv[0];
     else
         cmd++;
-    /*
-    * Перейти в режим демона.
-    */
+
     daemonize(cmd);
-    /*
-    * Убедиться, что ранее не была запущена другая копия демона.
-    */
+
     if (already_running()) {
-        syslog(LOG_ERR, "демон уже запущен");
+        syslog(LOG_ERR, "%s: демон уже запущен", cmd);
         exit(1);
     }
-    /*
-    * Восстановить действие по умолчанию для сигнала SIGHUP
-    * и заблокировать все сигналы.
-    */
+
     sa.sa_handler = SIG_DFL;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = 0;
-    if (sigaction(SIGHUP, &sa, NULL) < 0)
-        err_quit("%s: невозможно восстановить действие SIG_DFL для SIGHUP");
+    if (sigaction(SIGHUP, &sa, NULL) == -1) {
+        syslog(LOG_ERR, "невозможно восставновить действие SIG_DFL для SIGHUP");
+        exit(1);
+    }
     sigfillset(&mask);
-    if ((err = pthread_sigmask(SIG_BLOCK, &mask, NULL)) != 0)
-        err_exit(err, "ошибка выполнения операции SIG_BLOCK");
-    /*
-    * Создать поток для обработки SIGHUP и SIGTERM.
-    */
-    err = pthread_create(&tid, NULL, daemon_body, 0);
-    if (err != 0)
-        err_exit(err, "невозможно создать поток");
+    if ((err = pthread_sigmask(SIG_BLOCK, &mask, NULL)) != 0) {
+        syslog(LOG_ERR, "ошибка выполнения операции SIG_BLOCK");
+        exit(1);
+    }
 
-    exit(0);
+    err = pthread_create(&tid, NULL, thr_fn, 0);
+    if (err != 0) {
+        syslog(LOG_ERR, "невозможно создать поток");
+        exit(1);
+    }
+
+    syslog(LOG_INFO, "Login after daemonize:%s\n", getlogin());
+    while (1) {
+        t = time(NULL);
+        struct tm tm = *localtime(&t);
+        syslog(LOG_INFO, "%s: Current time is: %02d:%02d:%02d\n",
+                cmd, tm.tm_hour, tm.tm_min, tm.tm_sec);
+        sleep(1);
+    }
+    return 0;
 }
