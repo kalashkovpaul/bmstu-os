@@ -78,6 +78,15 @@ void daemonize(const char *cmd)
     else if (pid != 0) /* родительский процесс */
         exit(0);
 
+    /*
+    * Обеспечить невозможность обретения управляющего терминала в будущем.
+    */
+    sa.sa_handler = SIG_IGN;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    if (sigaction(SIGHUP, &sa, NULL) < 0)
+        perror("невозможно игнорировать сигнал SIGHUP");
+
 	/*
     * 3. Вызвать setsid()
     */
@@ -87,14 +96,6 @@ void daemonize(const char *cmd)
         syslog(LOG_ERR, "невозможно сделать процесс лидером сессии и группы: %s", strerror(errno));
         exit(1);
     }
-    /*
-    * Обеспечить невозможность обретения управляющего терминала в будущем.
-    */
-    sa.sa_handler = SIG_IGN;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = 0;
-    if (sigaction(SIGHUP, &sa, NULL) < 0)
-        perror("невозможно игнорировать сигнал SIGHUP");
 
     /*
     * 4. Назначить корневой каталог текущим рабочим каталогом,
@@ -149,17 +150,6 @@ void *thr_fn(void *arg)
         }
     }
     return 0;
-}
-
-void *daemon_body(void *arg)
-{
-    long int time_d;
-    while(1)
-    {
-        time_d = time(NULL);
-        syslog(LOG_INFO, "Демон, время: %s\n", ctime(&time_d));
-        sleep(5);
-    }
 }
 
 int main(int argc, char *argv[])
