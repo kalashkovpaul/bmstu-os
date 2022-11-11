@@ -138,7 +138,7 @@ void *thr_fn(void *arg)
         }
         switch (signo) {
         case SIGHUP:
-            syslog(LOG_INFO, "Чтение конфигурационного файла");
+            syslog(LOG_INFO, "чтение конфигурационного файла");
 
             break;
         case SIGTERM:
@@ -170,7 +170,7 @@ int main(int argc, char *argv[])
     char *cmd;
     struct sigaction sa;
 
-    printf("Login before daemonize:%s\n", getlogin());
+    printf("Before daemonize\n");
 
     if ((cmd = strrchr(argv[0], '/')) == NULL)
         cmd = argv[0];
@@ -203,7 +203,7 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    syslog(LOG_INFO, "Login after daemonize:%s\n", getlogin());
+    syslog(LOG_INFO, "After daemonize\n");
     while (1) {
         t = time(NULL);
         struct tm tm = *localtime(&t);
