@@ -16,6 +16,9 @@ const int count = 15;
 
 int* buf;
 int* arr;
+
+int* prod_ptr;
+int* cons_ptr;
 int* alpha_ptr;
 
 #define CONS (0)
@@ -26,6 +29,13 @@ struct sembuf start_prod[2] = {{PROD,-1,0},{BIN,-1,0}};
 struct sembuf stop_prod[2]  = {{CONS,1,0},{BIN,1,0}};
 struct sembuf start_cons[2] = {{CONS,-1,0},{BIN,-1,0}};
 struct sembuf stop_cons[2]  = {{PROD,1,0},{BIN,1,0}};
+
+//TODO: функции создания потребителей и производителей,
+//      проверять на ошибки semstl, semop
+//      производить алфавит, а не числа (соответственно, char,  а не int),
+//          для этого alpha_ptr - указатель на последний записанный, count=26 - количество пустых ячеек
+//      3 потребителя, 3 производителя
+//      очередь, а не стек - для этого prot_prt, cons_ptr
 
 int main()
 {
@@ -63,7 +73,7 @@ int main()
 		return 1;
 	}
 
-	semctl(semid, 2, SETVAL, 0);
+	semctl(semid, 2, SETVAL, 0); // TODO: проверять на ошибку
 	semctl(semid, 1, SETVAL, num);
 	semctl(semid, 2, SETVAL, 1);
 
