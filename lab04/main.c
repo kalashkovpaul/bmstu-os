@@ -125,13 +125,6 @@ void create_consumers() {
 
 int main()
 {
-    key_t sem_key = ftok("key_file1",0);
-    if (sem_key == -1)
-    {
-        printf("ftok error\n");
-        return 1;
-    }
-
     key_t mem_key = ftok("key_file2",0);
     if (mem_key == -1)
     {
@@ -162,7 +155,7 @@ int main()
     *cons_ptr = addr3;
     (*alpha_ptr) = 'a';
 
-	if ((semid = semget(sem_key, 3, IPC_CREAT | PERMS)) == -1)
+	if ((semid = semget(mem_key, 3, IPC_CREAT | PERMS)) == -1)
 	{
 		perror("semget error\n");
 		exit(1);
