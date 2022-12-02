@@ -1,124 +1,190 @@
-#include <sys/ipc.h>
 #include <sys/sem.h>
-#include <sys/stat.h>
 #include <sys/shm.h>
-#include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <math.h>
-#include <time.h>
 
-const int MY_FLAG = IPC_CREAT | S_IRWXU | S_IRWXG | S_IRWXO;
-const int num = 10;
-const int count = 15;
+#define SIZE_BUF 256
+#define PRODUCERS_AMOUNT 3
+#define CONSUMERS_AMOUNT 3
+#define PERMS S_IRWXU | S_IRWXG | S_IRWXO
 
-int* buf;
-int* arr;
+int shmid, semid;
+char* shared_buffer;
 
-int* prod_ptr;
-int* cons_ptr;
-int* alpha_ptr;
+char* prod_ptr;
+char* cons_ptr;
+char* alpha_ptr;
 
-#define CONS (0)
-#define PROD (1)
-#define BIN (2)
+#define SB 0
+#define SE 1
+#define SF 2
 
-struct sembuf start_prod[2] = {{PROD,-1,0},{BIN,-1,0}};
-struct sembuf stop_prod[2]  = {{CONS,1,0},{BIN,1,0}};
-struct sembuf start_cons[2] = {{CONS,-1,0},{BIN,-1,0}};
-struct sembuf stop_cons[2]  = {{PROD,1,0},{BIN,1,0}};
+#define P -1
+#define V 1
 
-//TODO: функции создания потребителей и производителей,
-//      проверять на ошибки semstl, semop
-//      производить алфавит, а не числа (соответственно, char,  а не int),
-//          для этого alpha_ptr - указатель на последний записанный, count=26 - количество пустых ячеек
-//      3 потребителя, 3 производителя
-//      очередь, а не стек - для этого prot_prt, cons_ptr
+struct sembuf start_produce[2] = { {SE, P, 0}, {SB, P, 0} };
+struct sembuf stop_produce[2] =  { {SB, V, 0}, {SF, V, 0} };
+struct sembuf start_consume[2] = { {SF, P, 0}, {SB, P, 0} };
+struct sembuf stop_consume[2] =  { {SB, V, 0}, {SE, V, 0} };
+
+void producer(const int semid)
+{
+	while (1)
+	{
+        int sem_op_p = semop(semid, start_produce, 2);
+        if (sem_op_p == -1)
+        {
+            perror("semop error\n");
+            exit(1);
+        }
+
+        shared_buffer[*prod_ptr] = *alpha_ptr;
+        printf("Producer %d - %c\n", getpid(), shared_buffer[*prod_ptr]);
+
+        (*prod_ptr)++;
+        (*alpha_ptr)++;
+
+        sleep(rand() % 3);
+
+        int sem_op_v = semop(semid, stop_produce, 2);
+        if (sem_op_v == -1)
+        {
+            perror("semop error\n");
+            exit(1);
+        }
+    }
+}
+
+void consumer(const int semid)
+{
+	while(1)
+	{
+        int sem_op_p = semop(semid, start_consume, 2);
+        if (sem_op_p == -1)
+        {
+            perror("semop error\n");
+            exit(1);
+        }
+
+        printf("Consumer %d - %c\n", getpid(), shared_buffer[*cons_ptr]);
+        (*cons_ptr)++;
+
+        sleep(rand() % 3);
+
+        int sem_op_v = semop(semid, stop_consume, 2);
+        if (sem_op_v == -1)
+        {
+            perror("semop error\n");
+            exit(1);
+        }
+    }
+}
+
+void create_producers() {
+    int pid = -1;
+
+	for (int i = 0; i < PRODUCERS_AMOUNT; i++)
+    {
+        pid = fork();
+        if (pid == -1)
+        {
+            perror("fork error\n");
+            exit(1);
+        }
+
+        if (pid == 0)
+        {
+            producer(semid);
+            return;
+        }
+	}
+}
+
+void create_consumers() {
+    int pid = -1;
+
+    for (int i = 0; i < CONSUMERS_AMOUNT; i++)
+    {
+        pid = fork();
+        if (pid == -1)
+        {
+            perror("fork error\n");
+            exit(1);
+        }
+
+        if (pid == 0)
+        {
+            consumer(semid);
+            return;
+        }
+	}
+}
 
 int main()
 {
-
-	key_t mem_key;
-	key_t sem_key = ftok("key_file",0);
+    key_t sem_key = ftok("key_file1",0);
     if (sem_key == -1)
     {
         printf("ftok error\n");
         return 1;
     }
 
- 	int shmid, semid, status;
+    key_t mem_key = ftok("key_file2",0);
+    if (mem_key == -1)
+    {
+        printf("ftok error\n");
+        return 1;
+    }
 
-	if ((shmid = shmget(mem_key, (num + 1)*sizeof(int), MY_FLAG)) == -1)
+	if ((shmid = shmget(mem_key, (SIZE_BUF + 3) * sizeof(char), IPC_CREAT | PERMS)) == -1)
 	{
-		printf("shmget error\n");
-		return 1;
+		perror("shmget error\n");
+		exit(1);
 	}
 
-	arr = shmat(shmid, 0, 0);
-	buf = arr + sizeof(int);
-
-	(*arr) = 0;
-
-	if (*buf == -1)
+	prod_ptr = shmat(shmid, NULL, 0);
+	if (prod_ptr == (void*) -1)
 	{
-		printf("shmat error\n");
-		return 1;
+		perror("shmat error\n");
+		exit(1);
 	}
 
-	if ((semid = semget(sem_key, 3, MY_FLAG)) == -1)
+	cons_ptr = prod_ptr + sizeof(char);
+    alpha_ptr = prod_ptr + 2 * sizeof(char);
+	shared_buffer = prod_ptr + 3 * sizeof(char);
+
+	(*prod_ptr) = 0;
+	(*cons_ptr) = 0;
+    (*alpha_ptr) = 'a';
+
+	if ((semid = semget(sem_key, 3, IPC_CREAT | PERMS)) == -1)
 	{
-		printf("semget error\n");
-		return 1;
+		perror("semget error\n");
+		exit(1);
 	}
 
-	semctl(semid, 2, SETVAL, 0); // TODO: проверять на ошибку
-	semctl(semid, 1, SETVAL, num);
-	semctl(semid, 2, SETVAL, 1);
+	int c_sb = semctl(semid, SB, SETVAL, 1);
+	int c_se = semctl(semid, SE, SETVAL, SIZE_BUF);
+	int c_sf = semctl(semid, SF, SETVAL, 0);
 
-	srand(time(NULL));
-
-	pid_t pid;
-	if ((pid = fork()) == -1)
+	if (c_se == -1 || c_sf == -1 || c_sb == -1)
 	{
-		printf("fork error\n");
-		return 1;
+		perror("semctl error\n");
+		exit(1);
 	}
 
-	int k = 0;
+    create_producers();
+    create_consumers();
 
-    alpha_ptr = buf;
+	for (int i = 0; i < (CONSUMERS_AMOUNT + PRODUCERS_AMOUNT); i++)
+		wait(NULL);
 
-	if (pid != 0)
+	if (shmdt(prod_ptr) == -1)
 	{
-	    while(k < count)
-		{
-			semop(semid, start_prod, 2);
-            *alpha_ptr = 1 + rand() % 10;
-            printf("\t Producting: %d - %d\n", k, *alpha_ptr);
-            alpha_ptr += sizeof(int);
-			semop(semid, stop_prod, 2);
-			sleep(rand() % 2);
-			k++;
-		}
-        if (shmdt(arr) == -1)
-		{
-			printf("shmdt error\n");
-			return 1;
-		}
-        wait(&status);
-    } else {
-		while (k < count)
-		{
-			semop(semid, start_cons, 2);
-
-            alpha_ptr -= sizeof(int);
-            printf("Consuming  %d - %d\n", k, *alpha_ptr);
-			semop(semid, stop_cons, 2);
-			sleep(rand() % 2);
-			k++;
-		}
+		perror("shmdt error\n");
+		exit(1);
 	}
-	return 0;
 }
