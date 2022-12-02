@@ -6,16 +6,16 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#define SIZE_BUF 256
+#define SIZE_BUF 128
 #define PRODUCERS_AMOUNT 3
 #define CONSUMERS_AMOUNT 3
 #define PERMS S_IRWXU | S_IRWXG | S_IRWXO
 
 int shmid, semid;
-char* shared_buffer;
+char* addr3;
 
-char* prod_ptr;
-char* cons_ptr;
+char** prod_ptr;
+char** cons_ptr;
 char* alpha_ptr;
 
 #define SB 0
@@ -41,8 +41,8 @@ void producer(const int semid)
             exit(1);
         }
 
-        shared_buffer[*prod_ptr] = *alpha_ptr;
-        printf("Producer %d - %c\n", getpid(), shared_buffer[*prod_ptr]);
+        (**prod_ptr) = *alpha_ptr;
+        printf("Producer %d - %c\n", getpid(), **prod_ptr);
 
         (*prod_ptr)++;
         (*alpha_ptr)++;
@@ -69,7 +69,7 @@ void consumer(const int semid)
             exit(1);
         }
 
-        printf("Consumer %d - %c\n", getpid(), shared_buffer[*cons_ptr]);
+        printf("Consumer %d - %c\n", getpid(), **cons_ptr);
         (*cons_ptr)++;
 
         sleep(rand() % 3);
@@ -139,25 +139,27 @@ int main()
         return 1;
     }
 
-	if ((shmid = shmget(mem_key, (SIZE_BUF + 3) * sizeof(char), IPC_CREAT | PERMS)) == -1)
+
+	if ((shmid = shmget(mem_key, ((SIZE_BUF + 1)*sizeof(char) + 2*sizeof(char*)), IPC_CREAT | PERMS)) == -1)
 	{
 		perror("shmget error\n");
 		exit(1);
 	}
 
-	prod_ptr = shmat(shmid, NULL, 0);
+	char* addr = shmat(shmid, NULL, 0);
 	if (prod_ptr == (void*) -1)
 	{
 		perror("shmat error\n");
 		exit(1);
 	}
 
-	cons_ptr = prod_ptr + sizeof(char);
-    alpha_ptr = prod_ptr + 2 * sizeof(char);
-	shared_buffer = prod_ptr + 3 * sizeof(char);
+    prod_ptr = addr;
+    cons_ptr = addr + sizeof(char*);
+    alpha_ptr = cons_ptr + sizeof(char*);
+	addr3 = alpha_ptr + sizeof(char);
 
-	(*prod_ptr) = 0;
-	(*cons_ptr) = 0;
+	*prod_ptr = addr3;
+    *cons_ptr = addr3;
     (*alpha_ptr) = 'a';
 
 	if ((semid = semget(sem_key, 3, IPC_CREAT | PERMS)) == -1)
