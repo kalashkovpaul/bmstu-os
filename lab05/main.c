@@ -27,16 +27,18 @@ const int PERMS =  S_IRWXU | S_IRWXG | S_IRWXO;
 int *shm_buf;
 int sem_id;
 
-struct sembuf start_read[] = {{WAITING_READERS, V, 0}, {ACTIVE_WRITER, 0, 0}, {WAITING_WRITERS, 0, 0}, {ACTIVE_READERS, V, 0}, {WAITING_READERS, P, 0}};
-struct sembuf stop_read[] = { {ACTIVE_READERS, P, 0}};
-struct sembuf start_write[] = { {WAITING_WRITERS, V, 0}, {ACTIVE_READERS, 0, 0}, {ACTIVE_WRITER, 0, 0}, {ACTIVE_WRITER, V, 0}, {WAITING_WRITERS, P, 0}, {BIN_WRITER, V, 0}};
-struct sembuf stop_write[] = { {ACTIVE_WRITER, P, 0}, {BIN_WRITER, P, 0}};
+struct sembuf start_read[] = {{WAITING_READERS, V, 0}, {BIN_WRITER, 0, 0}, /*{ACTIVE_WRITER, 0, 0},*/
+{WAITING_WRITERS, 0, 0}, {ACTIVE_READERS , V, 0}, {WAITING_READERS, P, 0}};
+struct sembuf stop_read[] = {{ACTIVE_READERS, P, 0}};
+struct sembuf start_write[] = {{WAITING_WRITERS, V, 0}, {ACTIVE_READERS, 0, 0},
+/*{ACTIVE_WRITER, 0, 0},*/ {BIN_WRITER, P, 0}, /*{ACTIVE_WRITER, V, 0},*/ {WAITING_WRITERS, P, 0}};
+struct sembuf stop_write[] = {/*{ACTIVE_WRITER, P, 0}, */{BIN_WRITER, V, 0}};
 
 void reader(int semid, int* shm)
 {
     while (1)
     {
-        semop(semid, start_read, 5);
+        semop(semid, start_read, 4);
 		printf("Reader %d - %d\n", getpid(), *shm);
         semop(semid, stop_read, 1);
         sleep(rand() % SLEEP);
@@ -47,11 +49,11 @@ void writer(int semid, int* shm)
 {
     while (1)
     {
-        semop(semid, start_write, 6);
+        semop(semid, start_write, 4);
         (*shm)++;
         printf("Writer %d - %d\n", getpid(), *shm);
         sleep(rand() % SLEEP);
-        semop(semid, stop_write, 2);
+        semop(semid, stop_write, 1);
     }
 }
 
@@ -100,7 +102,13 @@ void create_readers()
 int main()
 {
     int shm_id;
-    if ((shm_id = shmget(IPC_PRIVATE, sizeof(int), IPC_CREAT | PERMS)) == -1)
+    key_t key = ftok("key_file",0);
+    if (key == -1)
+    {
+        printf("ftok error\n");
+        return 1;
+    }
+    if ((shm_id = shmget(key, sizeof(int), IPC_CREAT | PERMS)) == -1)
 	{
 		perror("shmget error\n");
 		exit(1);
@@ -116,9 +124,15 @@ int main()
 
     (*shm_buf) = 0;
 
-    if ((sem_id = semget(IPC_PRIVATE, 5, IPC_CREAT | PERMS)) == -1)
+    if ((sem_id = semget(key, 5, IPC_CREAT | PERMS)) == -1)
 	{
 		perror("semget error\n");
+		exit(1);
+	}
+
+	if ((semctl(sem_id, BIN_WRITER, SETVAL, 1)) == -1)
+	{
+		perror("semctl error\n");
 		exit(1);
 	}
 
