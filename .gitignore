@@ -4,3 +4,4 @@
 *.blg
 *.out
 *.h.gch
+*.o
