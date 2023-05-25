@@ -73,7 +73,7 @@ int main()
     char buff2[20];
     setvbuf(fs2,buff2,_IOFBF,20);
     
-    int flag1 = 1, flag2 = 2;
+    int flag1 = 1, flag2 = 1;
     while(flag1 == 1 || flag2 == 1)
     {
         char c;
@@ -92,7 +92,7 @@ int main()
 	\captionsetup{justification=raggedright,singlelinecheck=off}
 
 	\begin{lstlisting}[label=lst:prog1-2,caption=Программа 1 --- один поток --- часть 2]
-         if (flag2 == 1) 
+        if (flag2 == 1) 
         { 
             fprintf(stdout,"%c",c); 
         }
@@ -193,18 +193,22 @@ int main(void)
 
 \subsubsection*{Анализ полученного результата}
 
-При первом вызове $fscanf(fs1, "\%c", \&c)$ в буфер $buff1$ будут скопированы первые 20 символов (т.е. $abcdefghijklmnopqrst$), после чего в переменную $c$ записывается (и потом выводится) буква $a$. 
+Системный вызов $open$ возвращает дескриптор $fd$ типа $int$ открытого файла, затем два раза вызывается $fdopen$, которой передаётся полученный дескриптор $fd$. Функция возвращает указатель на структуру $FILE$.
 
-При первом вызове $fscanf(fs2, "\%c", \&c)$ в буфер $buff2$ будут скопировоны оставшиеся символы (т.е. $uvwxyz$), после чего в переменную $c$ записывается (и потом выводится) буква $u$.
+Функция $setvbuf$ задаёт размер буфера 20 байт, создаются два буфера.
 
-Внутри цикла будут поочерёдно выводиться символы из буферов $buff1$ и $buff2$ до тех пор, пока символы в одном из них не закончатся.
-После этого будут выведены оставшиеся символы из другого буфера.
+%Функции $fscanf(fs1, "\%c", \&c)$ копирует в буфер $buff1$ первые 20 символов (т.е. $abcdefghijklmnopqrst$), в переменную $c$ записывается ) буква $a$. 
+%
+%$fscanf(fs2, "\%c", \&c)$ копирует в буфер $buff2$ оставшиеся символы (т.е. $uvwxyz$), в переменную $c$ записывается буква $u$.
 
-Системный вызов $open$ создаёт дескриптор открытого для чтения файла и возвращает числовой дескриптор, являющейся индексом в массиве $fd$ таблицы открытых файлов процесса $struct files_struct$. 
+%В цикле будут поочерёдно выводиться символы из буферов $buff1$ и $buff2$ до тех пор, пока символы в одном из них не закончатся.
+%После этого будут выведены оставшиеся символы из другого буфера.
 
-Вызов функции $fdopen$ создаёт экземпляры структуры $FILE$, которые ссылаются на созданный функцией $open$ дескриптор.
+Предполагается, что, читая в цикле сначала по указателю fs1, а потом по указателю fs2, можно предположить, что символы будут прочитаны последовательно, однако буферизованный ввод-вывод приводит к тому, что при первом вызове заполняется буфер (т.е. 20 символов), которые будут выведены на экран.
 
-Функция $setvbuf$ задают буфера для соответствующих дескрипторов $fs1$ и $fs2$, а также устанавливают тип буферизации $_IOFBF$ (полная буферизация).
+При втором вызове заполняется второй буфер оставшимися символами (до символа окончания файла), и затем они выводятся на экран.
+
+Таким образом, полученный результат является следствием буферизации,
 
 \subsubsection*{Связь структур}
 
@@ -235,7 +239,7 @@ int main()
     int fd1 = open("alphabet.txt", O_RDONLY);
     int fd2 = open("alphabet.txt", O_RDONLY);
 
-    int flag1 = 1, flag2 = 2;
+    int flag1 = 1, flag2 = 1;
     while(flag1 == 1 || flag2 == 1)
     {
         char c;
@@ -268,7 +272,7 @@ int main()
 
 \clearpage
 
-\subsection{Программа 2, два потока}
+\subsection*{Программа 2, два потока}
 
 \begin{center}
 	\captionsetup{justification=raggedright,singlelinecheck=off}
@@ -279,39 +283,38 @@ int main()
 #include <stdio.h>
 #include <unistd.h>
 
-pthread_mutex_t mux;
-
-void *thread_routine(void *arg) 
+void *thread_routine(void *arg)
 {
     int fd = *((int *)arg);
 
     int flag = 1;
     char c;
 
-    pthread_mutex_lock(&mux);
-    while (flag == 1) 
+    while (flag == 1)
     {
         flag = read(fd, &c, 1);
-        if (flag == 1) 
+        if (flag == 1)
             write(1, &c, 1);
     }
-    pthread_mutex_unlock(&mux);
 }
 
-int main() 
+int main()
 {
     int fd1 = open("alphabet.txt", O_RDONLY);
     int fd2 = open("alphabet.txt", O_RDONLY);
 
     pthread_t thr_worker;
 
-    if (pthread_mutex_init(&mux, NULL) != 0) 
-    {
-        printf("can't pthread_mutex_init.\n");
-        return 1;
-    }
-
     pthread_create(&thr_worker, NULL, thread_routine, &fd1);
+
+    int flag = 1;
+    char c;
+    while (flag == 1)
+    {
+        flag = read(fd2, &c, 1);
+        if (flag == 1)
+            write(1, &c, 1);
+    }
 	\end{lstlisting}
 \end{center}
 
@@ -321,18 +324,6 @@ int main()
 	\captionsetup{justification=raggedright,singlelinecheck=off}
 
 	\begin{lstlisting}[label=lst:prog2-th-2,caption=Программа 2 --- два потока --- часть 2]
-		int flag = 1;
-    char c;
-
-    pthread_mutex_lock(&mux);
-    while (flag == 1) 
-    {
-        flag = read(fd2, &c, 1);
-        if (flag == 1) 
-            write(1, &c, 1);
-    }
-    pthread_mutex_unlock(&mux);
-    
     pthread_join(thr_worker, NULL);
     printf("\n");
     return 0;
@@ -352,9 +343,10 @@ int main()
 
 \subsubsection*{Анализ результата}
 
-При использовании функции $open$ для открытия одного и того же файла 2 раза будет создано 2 дескриптора в таблице открытых файлов процесса (причём inode  у них будет один и тот же), у каждого из них значение поля $f_pos$ будет своё,
+Системные вызовы $open$ для открытия файла $alphabet.txt$ создают дескрипторы $fs1$ и $fs2$  типа $int$ открытых файлов и создают структуры $struct file$.
 
-При чтении, использующем такие дескрипторы, будет поочерёдно изменяться значение $f_pos$, что приведёт к полному прочтению файла 2 раза.
+Поочерёдный вызов $read$ для  $fs1$ и $fs2$ меняет значения полей $f\_pos$ в структурах $struct file$, что приводит к полному прочтению $alphabet.txt$ 2 раза.
+
 
 \clearpage
 
@@ -494,11 +486,15 @@ int main()
 
 \subsubsection*{Анализ результатов}
 
-При использовании функции $fopen$ для открытия файла $out.txt$ на запись два раза будет создано две структуры $_IO_FILE$, а также две независимых структуры $struct file$ c независимыми полями $f_pos$, но с одной и той же структурой $struct inode$.
+Системные вызовы $open$ для открытия файла $alphabet.txt$ создают дескрипторы $fs1$ и $fs2$  открытых файлов и создают структуры $struct file$.
 
-Функция $fprintf$ создаёт буфер, в который информация помещается перед тем, как быть записана в файл.
+Поочерёдный вызов $read$ для  $fs1$ и $fs2$ меняет значения полей $f\_pos$ в структурах $struct file$, что приводит к полному прочтению $alphabet.txt$ 2 раза.
 
-Из буфера, созданного $fprintf$, информация копируется в файл при выполнении одного из трёх условий:
+Вызовы $fopen$ открытия файла $out.txt$ производят системный вызовы $open$, которые открывают файл $out.txt$ и создают структуры $struct file$.
+
+Функция $fprintf$ получает указатель на буфер, в который информация помещается перед тем, как быть записана в файл.
+
+Из буфера информация копируется в файл при выполнении одного из трёх условий:
 
 \begin{enumerate}
 	\item Буфер заполнен.
@@ -506,20 +502,50 @@ int main()
 	\item Вызван $fclose$.
 \end{enumerate}
 
-Для приведённых программ: запись осуществляется при вызове $fclose$ для $f1$ (буфер $f1$ записывается в файл), при вызове $fclose$ для $f2$ (буфер $f2$ записывается в файл), происходит утеря данных, в файле оказывается только содержимое буфера $f2$.
+Проблемой такого использования fprintf является утеря данных: в файле оказывается только содержимое буфера $f2$, поскольку запись происходит в следующем порядке: сначала при вызове $fclose$ для $f1$ (буфер $f1$ записывается в файл), после чего при вызове $fclose$ для $f2$ (буфер $f2$ записывается в файл).
 
-Данную проблему можно решить, использовав флаг $O_APPEND$ при вызове функции $open$ --- это гарантирует неделимость каждой операации записи,
+Данную проблему можно решить, используя флаг $O\_APPEND$ при вызове функции $open$ --- это гарантирует добавление данных в конец файла.
+Также можно использовать средства взаимоисключения, такие, как $mutex$-ы и семафоры.
 
 \clearpage
-\subsubsection*{Связь структур}
+
+\subsection*{Программа 3, open и O\_APPEND}
+\begin{center}
+	\captionsetup{justification=raggedright,singlelinecheck=off}
+
+\begin{lstlisting}[label=lst:prog3-th-2,caption=Программа 3 --- open]
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+int main()
+{
+    char *alphabet = "abcdefghijklmnopqrstuvwxyz";
+    int fd1 = open("out.txt", O_WRONLY |O_APPEND|O_CREAT);
+    int fd2 = open("out.txt",O_WRONLY |O_APPEND|O_CREAT);
+    for (char i = 0; i < 26; i++)
+    {
+        i % 2 ? write(fd1, alphabet + i,1) : write(fd2,alphabet + i,1);
+    }
+    close(fd1);
+    close(fd2);
+    return 0;
+}
+
+\end{lstlisting}
+\end{center}
+
 
 \begin{figure}[h]
 	\centering
 	\captionsetup{justification=centering}
-	\includegraphics[width=160mm]{img/prog3_diagram.png}
-	\caption{Связь структур}
-	\label{fig:prog-3-diagram}
+	\includegraphics[width=150mm]{img/prog3_open.png}
+	\caption{Результаты работы программы 3 (open и O\_APPEND)}
+	\label{fig:prog-3-open-th-result}
 \end{figure}
+
+
+
 
 
 
