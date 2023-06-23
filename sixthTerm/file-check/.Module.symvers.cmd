@@ -1,0 +1,1 @@
+cmd_/home/paul/Desktop/os/file-check/Module.symvers := sed 's/\.ko$$/\.o/' /home/paul/Desktop/os/file-check/modules.order | scripts/mod/modpost -m -a  -o /home/paul/Desktop/os/file-check/Module.symvers -e -i Module.symvers   -T -

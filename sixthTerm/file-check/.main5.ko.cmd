@@ -1,0 +1,1 @@
+cmd_/home/paul/Desktop/os/file-check/main5.ko := ld -r  -m elf_x86_64 -z noexecstack   --build-id=sha1  -T scripts/module.lds -o /home/paul/Desktop/os/file-check/main5.ko /home/paul/Desktop/os/file-check/main5.o /home/paul/Desktop/os/file-check/main5.mod.o;  true
